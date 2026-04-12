@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transfer History</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="container">
+    <div class="topbar">
+        <h1>📋 Transfer History</h1>
+        <div class="topbar-actions">
+            <button class="icon-btn" id="darkToggle">🌙</button>
+            <button class="icon-btn" onclick="clearHistory()" title="Clear history">🗑️</button>
+            <a href="/" class="icon-btn">🏠</a>
+        </div>
+    </div>
+    <p class="subtitle">All past transfers</p>
+    <div id="historyList"></div>
+</div>
+
+<script>
+// Theme
+function loadTheme() {
+    fetch('/api/settings').then(r => r.json()).then(s => {
+        document.documentElement.setAttribute('data-theme', s.darkMode ? 'dark' : 'light');
+        document.getElementById('darkToggle').textContent = s.darkMode ? '☀️' : '🌙';
+    });
+}
+document.getElementById('darkToggle').addEventListener('click', async () => {
+    const current = document.documentElement.getAttribute('data-theme') === 'dark';
+    await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ darkMode: !current })
+    });
+    loadTheme();
+});
+loadTheme();
+
+// Load history
+async function loadHistory() {
+    const res = await fetch('/api/history');
+    const history = await res.json();
+    const list = document.getElementById('historyList');
+    if (!history.length) {
+        list.innerHTML = '<div class="no-devices">No transfers yet</div>';
+        return;
+    }
+    list.innerHTML = history.map(h => {
+        const date = new Date(h.date);
+        return `
+            <div class="history-item">
+                <div class="history-header">
+                    <div class="history-device">${h.device}</div>
+                    <div class="history-date">${date.toLocaleString()}</div>
+                </div>
+                <div class="history-count">${h.count} file(s) uploaded</div>
+            </div>
+        `;
+    }).join('');
+}
+
+async function clearHistory() {
+    if (!confirm('Clear all history?')) return;
+    await fetch('/api/history', { method: 'DELETE' });
+    loadHistory();
+}
+
+loadHistory();
+</script>
+</body>
+</html>

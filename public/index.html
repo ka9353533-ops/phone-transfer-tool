@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phone Transfer</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#667eea">
+    <script src="/socket.io/socket.io.js"></script>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="container">
+    <div class="topbar">
+        <h1>📱 Phone Transfer</h1>
+        <div class="topbar-actions">
+            <button class="icon-btn" id="darkToggle" title="Toggle dark mode">🌙</button>
+            <a href="/files.html" class="icon-btn" title="File browser">📁</a>
+            <a href="/history.html" class="icon-btn" title="Transfer history">📋</a>
+            <a href="/settings.html" class="icon-btn" title="Settings">⚙️</a>
+        </div>
+    </div>
+    <p class="subtitle">Wirelessly transfer photos & videos to your PC</p>
+
+    <div class="network-bar checking" id="networkBar">
+        <div class="dot grey" id="networkDot"></div>
+        <span id="networkText">Checking network...</span>
+    </div>
+
+    <div class="section-title">Connected Devices</div>
+    <div id="devicesList"><div class="no-devices">⏳ Waiting for devices...<br><small>Open this page on your phone</small></div></div>
+
+    <div class="upload-section" id="uploadSection">
+        <div class="section-title">Sending from: <span id="selectedDeviceName" style="color:var(--accent)"></span></div>
+        <div class="upload-area" id="uploadArea">
+            <div style="font-size:44px">📤</div>
+            <h3>Tap to select files</h3>
+            <p style="font-size:13px;margin-top:6px;color:var(--text-muted)">Photos & Videos</p>
+        </div>
+        <input type="file" id="fileInput" multiple accept="image/*,video/*">
+        <div class="file-count" id="fileCount"></div>
+        <button id="uploadBtn" disabled>Upload Files</button>
+        <div class="progress" id="progress"><div class="progress-bar"><div class="progress-fill" id="progressFill">0%</div></div></div>
+        <div class="status" id="status"></div>
+    </div>
+</div>
+<script src="/app.js"></script>
+</body>
+</html>

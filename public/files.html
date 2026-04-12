@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Browser</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="container">
+    <div class="topbar">
+        <h1>📁 File Browser</h1>
+        <div class="topbar-actions">
+            <button class="icon-btn" id="darkToggle">🌙</button>
+            <a href="/" class="icon-btn">🏠</a>
+        </div>
+    </div>
+    <p class="subtitle" id="folderPath">Loading...</p>
+    <div class="file-grid" id="fileGrid"></div>
+</div>
+
+<div class="modal" id="modal">
+    <button class="modal-close" onclick="closeModal()">×</button>
+    <div class="modal-content" id="modalContent"></div>
+</div>
+
+<script>
+// Theme
+function loadTheme() {
+    fetch('/api/settings').then(r => r.json()).then(s => {
+        document.documentElement.setAttribute('data-theme', s.darkMode ? 'dark' : 'light');
+        document.getElementById('darkToggle').textContent = s.darkMode ? '☀️' : '🌙';
+    });
+}
+document.getElementById('darkToggle').addEventListener('click', async () => {
+    const current = document.documentElement.getAttribute('data-theme') === 'dark';
+    await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ darkMode: !current })
+    });
+    loadTheme();
+});
+loadTheme();
+
+// Load files
+async function loadFiles() {
+    const res = await fetch('/api/files');
+    const data = await res.json();
+    document.getElementById('folderPath').textContent = data.folder;
+    const grid = document.getElementById('fileGrid');
+    if (!data.files.length) {
+        grid.innerHTML = '<div class="no-devices">No files yet</div>';
+        return;
+    }
+    grid.innerHTML = data.files.map(f => `
+        <div class="file-item" onclick="openFile('${f.name}', ${f.isImg}, ${f.isVid})">
+            ${f.isImg ? `<img src="/media/${f.name}" class="file-thumb" alt="${f.name}">` : 
+              f.isVid ? `<video src="/media/${f.name}" class="file-thumb"></video>` :
+              `<div class="file-thumb" style="display:flex;align-items:center;justify-content:center;font-size:40px">📄</div>`}
+            <div class="file-name">${f.name}</div>
+            <button class="file-delete" onclick="event.stopPropagation();deleteFile('${f.name}')">🗑️</button>
+        </div>
+    `).join('');
+}
+
+function openFile(name, isImg, isVid) {
+    const modal = document.getElementById('modal');
+    const content = document.getElementById('modalContent');
+    if (isImg) content.innerHTML = `<img src="/media/${name}" alt="${name}">`;
+    else if (isVid) content.innerHTML = `<video src="/media/${name}" controls autoplay></video>`;
+    else return;
+    modal.classList.add('visible');
+}
+
+function closeModal() {
+    document.getElementById('modal').classList.remove('visible');
+}
+
+async function deleteFile(name) {
+    if (!confirm(`Delete ${name}?`)) return;
+    await fetch(`/api/files/${name}`, { method: 'DELETE' });
+    loadFiles();
+}
+
+loadFiles();
+</script>
+</body>
+</html>
