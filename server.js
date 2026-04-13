@@ -16,9 +16,11 @@ const PORT = process.env.PORT || 3000;
 const SETTINGS_FILE = path.join(__dirname, 'settings.json');
 const HISTORY_FILE  = path.join(__dirname, 'history.json');
 
-// Use temp directory for cloud deployment, or F:\ for local
+// Use temp directory for cloud deployment, or Downloads for local
 const isCloud = process.env.NODE_ENV === 'production';
-const defaultFolder = isCloud ? path.join(__dirname, 'uploads') : 'F:\\PhoneMedia';
+const defaultFolder = isCloud 
+    ? path.join(__dirname, 'uploads') 
+    : path.join(os.homedir(), 'Downloads', 'PhoneMedia');
 let settings = { downloadFolder: defaultFolder, darkMode: false };
 if (fs.existsSync(SETTINGS_FILE)) {
     try { settings = { ...settings, ...JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8')) }; } catch(e) {}
@@ -53,11 +55,12 @@ const storage = multer.diskStorage({
     destination: (req, file, cb) => { ensureDownloadFolder(); cb(null, settings.downloadFolder); },
     filename:    (req, file, cb) => { cb(null, `${Date.now()}-${file.originalname}`); }
 });
-const upload = multer({ storage, limits: { fileSize: 500 * 1024 * 1024, files: 100 } }).array('files', 100);
+const upload = multer({ storage, limits: { fileSize: 2000 * 1024 * 1024, files: 1000 } }).array('files', 1000);
 
-// ── Middleware ────────────────────────────────────────────────────────────────
+// Enable CORS and increase body size limit
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '2gb' }));
+app.use(express.urlencoded({ limit: '2gb', extended: true }));
 app.use(express.static('public'));
 
 // ── Connected devices ─────────────────────────────────────────────────────────
@@ -119,14 +122,33 @@ app.get('/media/:name', (req, res) => {
     res.sendFile(file);
 });
 
-// Upload
+// Upload with retry logic and better error handling
 app.post('/upload', (req, res) => {
+    console.log('📥 Upload request received');
+    
     upload(req, res, (err) => {
-        if (err instanceof multer.MulterError) return res.status(400).json({ error: err.message });
-        if (err) return res.status(500).json({ error: err.message });
-        if (!req.files?.length) return res.status(400).json({ error: 'No files received' });
+        if (err instanceof multer.MulterError) {
+            console.error('❌ Multer error:', err.message);
+            if (err.code === 'LIMIT_FILE_SIZE') {
+                return res.status(400).json({ error: 'File too large. Max 2GB per file.' });
+            }
+            if (err.code === 'LIMIT_FILE_COUNT') {
+                return res.status(400).json({ error: 'Too many files. Max 1000 files at once.' });
+            }
+            return res.status(400).json({ error: 'Upload error: ' + err.message });
+        } else if (err) {
+            console.error('❌ Unknown error:', err.message);
+            return res.status(500).json({ error: 'Server error: ' + err.message });
+        }
+        
+        if (!req.files?.length) {
+            console.error('❌ No files in request');
+            return res.status(400).json({ error: 'No files received' });
+        }
 
         const deviceName = req.headers['x-device-name'] || 'Unknown Device';
+        
+        // Save to history
         const entry = {
             id: Date.now(),
             device: deviceName,
@@ -140,7 +162,7 @@ app.post('/upload', (req, res) => {
         saveHistory();
 
         io.emit('files-received', entry);
-        console.log(`✅ ${req.files.length} files from ${deviceName}`);
+        console.log(`✅ ${req.files.length} files from ${deviceName} saved successfully`);
         res.json({ success: true, count: req.files.length });
     });
 });

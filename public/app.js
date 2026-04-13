@@ -145,11 +145,17 @@ uploadBtn?.addEventListener('click', async () => {
     uploadBtn.disabled = true;
     progress.style.display = 'block';
     status.style.display = 'none';
+    
+    // Show file count
+    const totalFiles = selectedFiles.length;
+    console.log(`Starting upload of ${totalFiles} files...`);
 
     const formData = new FormData();
     selectedFiles.forEach(f => formData.append('files', f));
 
     const xhr = new XMLHttpRequest();
+    
+    // Progress tracking
     xhr.upload.addEventListener('progress', (e) => {
         if (e.lengthComputable) {
             const pct = Math.round((e.loaded / e.total) * 100);
@@ -157,30 +163,64 @@ uploadBtn?.addEventListener('click', async () => {
             progressFill.textContent = pct + '%';
         }
     });
+    
+    // Success handler
     xhr.addEventListener('load', () => {
         if (xhr.status === 200) {
+            const response = JSON.parse(xhr.responseText);
             status.className = 'status success';
-            status.textContent = `✅ ${selectedFiles.length} file(s) uploaded!`;
+            status.textContent = `✅ ${response.count} file(s) uploaded successfully!`;
             status.style.display = 'block';
+            console.log(`✅ Upload complete: ${response.count} files`);
+            
+            // Clear selection
             selectedFiles = [];
             fileInput.value = '';
             fileCount.textContent = '';
-            setTimeout(() => { progress.style.display = 'none'; progressFill.style.width = '0%'; }, 2000);
+            
+            // Reset progress after 3 seconds
+            setTimeout(() => { 
+                progress.style.display = 'none'; 
+                progressFill.style.width = '0%'; 
+            }, 3000);
         } else {
+            let errorMsg = 'Upload failed';
+            try {
+                const response = JSON.parse(xhr.responseText);
+                errorMsg = response.error || errorMsg;
+            } catch(e) {
+                errorMsg = xhr.responseText || errorMsg;
+            }
+            console.error('❌ Upload failed:', errorMsg);
             status.className = 'status error';
-            status.textContent = '❌ Upload failed';
+            status.textContent = '❌ ' + errorMsg;
             status.style.display = 'block';
             progress.style.display = 'none';
         }
         uploadBtn.disabled = false;
     });
-    xhr.addEventListener('error', () => {
+    
+    // Error handler
+    xhr.addEventListener('error', (e) => {
+        console.error('❌ Network error during upload');
         status.className = 'status error';
-        status.textContent = '❌ Network error';
+        status.textContent = '❌ Network error. Check your connection and try again.';
         status.style.display = 'block';
         progress.style.display = 'none';
         uploadBtn.disabled = false;
     });
+    
+    // Timeout handler (30 minutes for large uploads)
+    xhr.timeout = 1800000; // 30 minutes
+    xhr.addEventListener('timeout', () => {
+        console.error('❌ Upload timeout');
+        status.className = 'status error';
+        status.textContent = '❌ Upload timeout. Try uploading fewer files at once.';
+        status.style.display = 'block';
+        progress.style.display = 'none';
+        uploadBtn.disabled = false;
+    });
+
     xhr.open('POST', '/upload');
     xhr.setRequestHeader('x-device-name', selectedDevice?.name || 'Unknown');
     xhr.send(formData);
